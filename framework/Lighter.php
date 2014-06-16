@@ -31,6 +31,8 @@ include_once('Router.php');
 include_once('HTTPUtils.php');
 include_once('models/Model.php');
 include_once('models/MySQLModel.php');
+include_once('mysql/MySQLDatabase.php');
+include_once('mysql/MySQLFactory.php');
 include_once('responses/Response.php');
 include_once('responses/ViewResponse.php');
 include_once('responses/NotFoundResponse.php');
@@ -72,6 +74,12 @@ class Lighter {
     private $autoloader = null;
 
     /**
+     * Instance of MySQL factory.
+     * @var null|MySQLFactory
+     */
+    private $mysql_factory = null;
+
+    /**
      * Call this function to run LighterPHP using server environment variables and application configuration files.
      */
     public function run() {
@@ -91,11 +99,21 @@ class Lighter {
         $this->autoloader->add_default_rules();
 
         /**
-         * Check if the autoloader is enabled, and if it is create it then install it.
+         * Check if the autoloader is enabled, and if it is create it then register it.
          */
         if(Configuration::get('Autoloader', 'enabled')) {
             $this->autoloader->register();
         }
+
+        /**
+         * Create an instance of MySQLFactory, just in case the application requires database access inside the autoloader.
+         */
+        $this->mysql_factory = new MySQLFactory();
+
+        /**
+         * Load the optional MySQL configuration, so the application does not have to.
+         */
+        Configuration::load('MySQL');
 
         /**
          * Every application has an Autorun.php where they can place code to run during startup.
@@ -266,11 +284,20 @@ class Lighter {
     public function get_route() {
         return $this->route;
     }
+
     /**
      * Retrieve the route parameters that were outputted when routing the request URI.
      * @return array
      */
     public function get_route_params() {
         return $this->route_params;
+    }
+
+    /**
+     * Retrieve the MySQL factory object which can be used to establish cacheable connections to MySQL databases.
+     * @return MySQLFactory
+     */
+    public function get_mysql_factory() {
+        return $this->mysql_factory;
     }
 }

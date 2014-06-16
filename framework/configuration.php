@@ -97,8 +97,8 @@ class Configuration {
         /**
          * Ensure that the variable they are trying to read exists, otherwise throw an exception.
          */
-        if(!isset(self::$configs[$configurationName][$key])) {
-            throw new Exception("Configuration key \"[$key}\" not found in configuration named \"{$configurationName}\".");
+        if(!array_key_exists($key, self::$configs[$configurationName])) {
+            throw new Exception("Configuration key \"{$key}\" not found in configuration named \"{$configurationName}\".");
         }
 
         /**

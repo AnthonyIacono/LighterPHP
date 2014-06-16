@@ -73,3 +73,13 @@ function lighter_require($filePath) {
 function lighter_require_once($filePath) {
     require_once($filePath);
 }
+
+/**
+ * Wrapper for rendering a view, so you don't have to type as much to render views inside views.
+ * @param $viewName - Name of view to be rendered, without .php
+ * @param array $viewVariables - Variables to be passed into the scope of the rendered view
+ * @return string
+ */
+function view($viewName, $viewVariables = array()) {
+    return ViewRenderer::render_view($viewName, $viewVariables);
+}

@@ -53,7 +53,7 @@ class ViewRenderer {
      * @return string
      */
     private static function extract_and_include($__variables, $__file) {
-        extract(array_merge($__variables), EXTR_OVERWRITE);
+        extract($__variables, EXTR_OVERWRITE);
 
         ob_start();
 

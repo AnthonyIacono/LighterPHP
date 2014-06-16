@@ -4,14 +4,14 @@ class SchemaExportShell extends  AppShell {
     public function main($arguments) {
         $output = '';
 
-        $tableRecords = \Plinq\Plinq::factory($this->database->selectQuery("SHOW TABLE STATUS FROM `{$this->database->database}`"))->Where(function($_, $record) use($arguments) {
+        $tableRecords = \Plinq\Plinq::factory($this->database->selectQuery("SHOW TABLE STATUS FROM `{$this->database->database_name}`"))->Where(function($_, $record) use($arguments) {
             return preg_match('/\\_view$/', $record->Name) || (!empty($arguments) && !in_array($record->Name, $arguments)) ? false : true;
         })->ToArray();
 
         $tables = array();
 
         foreach($tableRecords as $tableRecord) {
-            $records = $this->database->selectQuery("SHOW CREATE TABLE `{$this->database->database}`.`{$tableRecord->Name}`");
+            $records = $this->database->selectQuery("SHOW CREATE TABLE `{$this->database->database_name}`.`{$tableRecord->Name}`");
             $record = $records[0];
 
             $create_table_column = 'Create Table';

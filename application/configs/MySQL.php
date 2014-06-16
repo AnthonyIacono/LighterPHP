@@ -3,6 +3,7 @@ $config = array(
     'host' => "localhost",
     'username' => "root",
     'password' => "",
-    'database' => "appdb",
-    'prefix' => 'app_'
+    'database_name' => "catering",
+    'socket' => null,
+    'port' => 3306
 );

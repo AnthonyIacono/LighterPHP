@@ -21,8 +21,7 @@
 /**
  * Class Globals
  * Using this static class you are able to access common global variables referenced throughout
- * the lifetime of an HTTP request handled by LighterPHP. Below the class you will find several
- * helper functions.
+ * the lifetime of an HTTP request handled by LighterPHP.
  */
 class Globals {
     /**
