@@ -20,13 +20,13 @@ SQL;
                     $query .= "DEFAULT NULL";
                 }
                 else if($column_info['allow_null'] && $column_info['has_default']) {
-                    $query .= "DEFAULT " . $this->database->encode($column_info['default']);
+                    $query .= "DEFAULT " . $this->database->encode_value($column_info['default']);
                 }
                 else if(!$column_info['allow_null'] && !$column_info['has_default']) {
                     $query .= "NOT NULL";
                 }
                 else {
-                    $query .= "DEFAULT " . $this->database->encode($column_info['default']);
+                    $query .= "DEFAULT " . $this->database->encode_value($column_info['default']);
                 }
 
                 if($column_info['auto_incrementing']) {

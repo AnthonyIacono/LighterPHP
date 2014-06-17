@@ -1,8 +1,8 @@
 <?php
 
 class MySQLModel extends Model {
-    public $table_name = null;
-    public $view_name = null;
+    protected static $table_name = null;
+    protected static $view_name = null;
 
     /**
      * This function is called right before deleting

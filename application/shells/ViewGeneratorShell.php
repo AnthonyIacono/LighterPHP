@@ -46,7 +46,7 @@ class ViewGeneratorShell extends AppShell {
         // Start the SELECT statement
         $query = "SELECT\n\n";
 
-        $tableSchema = $this->database->show_columns($baseTableName, false, false);
+        $tableSchema = $this->database->get_schema_for_table($baseTableName, false, false);
 
         foreach($tableSchema as $schemaField) {
             $query .= "`{$baseTablePrefix}`.`{$schemaField->Field}` as `{$schemaField->Field}`,\n";
@@ -55,7 +55,7 @@ class ViewGeneratorShell extends AppShell {
         $query .= "\n";
 
         foreach($processedDependencyMap as $dependencyInfo) {
-            $dependencySchema = $this->database->show_columns($dependencyInfo['table_name'], false, false);
+            $dependencySchema = $this->database->get_schema_for_table($dependencyInfo['table_name'], false, false);
 
             foreach($dependencySchema as $dependencySchemaField) {
                 $query .= "`{$dependencyInfo['prefix']}`.`{$dependencySchemaField->Field}` as `{$dependencyInfo['prefix']}_{$dependencySchemaField->Field}`,\n";
@@ -82,7 +82,7 @@ class ViewGeneratorShell extends AppShell {
 
     public function getDependencyMap($tableName, $prefixName = '') {
         $prefixPreview = empty($prefixName) ? 'No prefix' : $prefixName;
-        $tableSchema = $this->database->show_columns($tableName, false, false);
+        $tableSchema = $this->database->get_schema_for_table($tableName, false, false);
 
         $dependencyMap = array();
 

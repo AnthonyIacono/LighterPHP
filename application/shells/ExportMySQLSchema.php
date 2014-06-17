@@ -42,7 +42,7 @@ class SchemaExportShell extends  AppShell {
                 );
             }, $record->{$create_table_column});
 
-            $columnStats = $this->database->show_columns($tableRecord->Name, false, false);
+            $columnStats = $this->database->get_schema_for_table($tableRecord->Name, false, false);
 
             foreach($columnStats as $columnSchema) {
                 $table_columns[$columnSchema->Field] = array(

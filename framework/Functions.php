@@ -83,3 +83,11 @@ function lighter_require_once($filePath) {
 function view($viewName, $viewVariables = array()) {
     return ViewRenderer::render_view($viewName, $viewVariables);
 }
+
+/**
+ * Returns a MySQL database object using the MySQL application configuration file.
+ * Wrapper for lighter()->get_mysql_factory()->get_default_mysql_database(), see MySQLFactory for more information.
+ */
+function db() {
+    return lighter()->get_mysql_factory()->get_default_mysql_database();
+}

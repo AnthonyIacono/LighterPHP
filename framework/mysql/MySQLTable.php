@@ -1,51 +1,31 @@
 <?php
 
-Lib::ImportFW('mysql/mysql_field_schema');
-Lib::ImportFW('mysql/mysql_record');
-Lib::ImportFW('mysql/mysql_fluent_select_query');
+class MySQLTable {
+    /**
+     * @var string
+     */
+    public $name;
 
-class MySQLTable extends Extendable {
     /**
      * @var MySQLDatabase
      */
     public $database;
 
     /**
-     * @var string
+     * @var MySQLTableSchema
      */
-    public $table;
+    public $schema;
 
     /**
      * @var MySQLFieldSchema
      */
-    public $primaryKey = false;
+    public $primary_key = null;
 
-    /**
-     * @var array
-     */
-    public $schema;
-
-    public $records;
-
-    public function __construct($properties = array()) {
-        parent::__construct($properties);
-
-        $this->schema = $this->database->show_columns($this->table);
-
-        $primaryKey = false;
-
-        foreach($this->schema as $field) {
-            if($field->Key == 'PRI') {
-                if($primaryKey !== false) {
-                    $primaryKey = null;
-                    continue;
-                }
-
-                $primaryKey = $field;
-            }
-        }
-
-        $this->primaryKey = empty($primaryKey) ? false : $primaryKey;
+    public function __construct($name, MySQLDatabase $database, MySQLTableSchema $schema, $primaryKey = false) {
+        $this->database = $database;
+        $this->name = $name;
+        $this->schema = $schema;
+        $this->primary_key = $primaryKey;
     }
 
     /**
@@ -61,24 +41,19 @@ class MySQLTable extends Extendable {
             $record = (object)$record->$savableMethod();
         }
 
-        // HACKHACK! I'm pretty sure it shouldn't matter, but there is some margin for error with this.
-        if(empty($record->datetime)) {
-            $record->datetime = StrLib::DateTime();
-        }
-
         // If there is a primary key, we should check if there is already an entry for this record.
-        if($this->primaryKey !== false && isset($record->{$this->primaryKey->Field})) {
-            $primaryKey = $this->primaryKey->Field;
+        if($this->primary_key !== false && isset($record->{$this->primary_key->Field})) {
+            $primaryKey = $this->primary_key->Field;
 
-            $primaryValueEncoded = $this->database->encode($record->{$primaryKey});
+            $primaryValueEncoded = $this->database->encode_value($record->{$primaryKey});
 
-            $result = $this->database->query("SELECT COUNT(*) FROM `{$this->table}` WHERE `{$this->table}`.`{$primaryKey}` = $primaryValueEncoded");
+            $result = $this->database->query("SELECT COUNT(*) FROM `{$this->name}` WHERE `{$this->name}`.`{$primaryKey}` = $primaryValueEncoded");
 
             $row = $result->fetch_assoc();
 
             // We can update the existing record.
             if($row['COUNT(*)']) {
-                $query = "UPDATE `{$this->table}` SET ";
+                $query = "UPDATE `{$this->name}` SET ";
 
                 $first = true;
                 foreach($record as $field => $value) {
@@ -96,12 +71,12 @@ class MySQLTable extends Extendable {
 
                     $query .= !$first ? ',' : '';
 
-                    $query .= "`{$this->table}`.`{$field}` = " . $this->database->encode($value);
+                    $query .= "`{$this->name}`.`{$field}` = " . $this->database->encode_value($value);
 
                     $first = false;
                 }
 
-                $query .= " WHERE `{$this->table}`.`{$primaryKey}` = {$primaryValueEncoded}";
+                $query .= " WHERE `{$this->name}`.`{$primaryKey}` = {$primaryValueEncoded}";
 
                 $this->database->query($query);
 
@@ -110,13 +85,13 @@ class MySQLTable extends Extendable {
         }
 
         // At this point we know should perform an INSERT
-        $query = "INSERT INTO `{$this->table}` (";
+        $query = "INSERT INTO `{$this->name}` (";
 
         $first = true;
         foreach($this->schema as $schema) {
             $query .= !$first ? ',' : '';
 
-            $query .= "`{$this->table}`.`{$schema->Field}`";
+            $query .= "`{$this->name}`.`{$schema->Field}`";
 
             $first = false;
         }
@@ -127,7 +102,7 @@ class MySQLTable extends Extendable {
         foreach($this->schema as $schema) {
             $query .= !$first ? ',' : '';
 
-            $query .= $this->database->encode(
+            $query .= $this->database->encode_value(
                 isset($record->{$schema->Field}) ? $record->{$schema->Field} :
                     ($schema->Null ? null : '')
             );
@@ -155,19 +130,19 @@ class MySQLTable extends Extendable {
         foreach($this->schema as $schema) {
             $query .= !$first ? ',' : '';
 
-            $query .= "`{$this->table}`.`{$schema->Field}`";
+            $query .= "`{$this->name}`.`{$schema->Field}`";
 
             $first = false;
         }
 
-        $query .= " FROM `{$this->table}` WHERE `{$this->table}`.`{$column}` = " . $this->database->encode($value);
+        $query .= " FROM `{$this->name}` WHERE `{$this->name}`.`{$column}` = " . $this->database->encode_value($value);
 
         $result = $this->database->query($query);
 
         $records = array();
 
         while($row = $result->fetch_object()) {
-            $recordModel = $this->database->construct_model($row, $modelType);
+            $recordModel = $this->database->construct_model_from_row_object($row, $modelType);
 
             $records[] = $recordModel;
         }
@@ -182,22 +157,22 @@ class MySQLTable extends Extendable {
         foreach($this->schema as $schema) {
             $query .= !$first ? ',' : '';
 
-            $query .= "`{$this->table}`.`{$schema->Field}`";
+            $query .= "`{$this->name}`.`{$schema->Field}`";
 
             $first = false;
         }
 
-        $query .= " FROM `{$this->table}` WHERE";
+        $query .= " FROM `{$this->name}` WHERE";
 
         $first = true;
         foreach($columns as $column => $value) {
             $operation = is_array($value) && isset($value['operation']) ? $value['operation'] : '=';
 
-            $encoded = $this->database->encode(is_array($value) ? $value['value'] : $value);
+            $encoded = $this->database->encode_value(is_array($value) ? $value['value'] : $value);
 
             $query .= !$first ? ' AND' : '';
 
-            $query .= " `{$this->table}`.`$column` $operation $encoded";
+            $query .= " `{$this->name}`.`$column` $operation $encoded";
 
             $first = false;
         }
@@ -209,7 +184,7 @@ class MySQLTable extends Extendable {
             foreach($order as $column => $direction) {
                 $query .= !$first ? ',' : '';
 
-                $query .= " `{$this->table}`.`$column` $direction";
+                $query .= " `{$this->name}`.`$column` $direction";
 
                 $first = false;
             }
@@ -220,7 +195,7 @@ class MySQLTable extends Extendable {
         $records = array();
 
         while($row = $result->fetch_object()) {
-            $records[] = $this->database->construct_model($row, $modelType);
+            $records[] = $this->database->construct_model_from_row_object($row, $modelType);
         }
 
         return $records;
@@ -233,12 +208,12 @@ class MySQLTable extends Extendable {
         foreach($this->schema as $schema) {
             $query .= !$first ? ',' : '';
 
-            $query .= "`{$this->table}`.`{$schema->Field}`";
+            $query .= "`{$this->name}`.`{$schema->Field}`";
 
             $first = false;
         }
 
-        $query .= " FROM `{$this->table}` WHERE `{$this->table}`.`{$column}` = " . $this->database->encode($value) .
+        $query .= " FROM `{$this->name}` WHERE `{$this->name}`.`{$column}` = " . $this->database->encode_value($value) .
             " LIMIT 1";
 
         $result = $this->database->query($query);
@@ -249,7 +224,7 @@ class MySQLTable extends Extendable {
             return null;
         }
 
-        return $this->database->construct_model($object, $modelType);
+        return $this->database->construct_model_from_row_object($object, $modelType);
     }
 
     public function firstByEx($columns = array(), $order = array(), $modelType = null) {
@@ -259,22 +234,22 @@ class MySQLTable extends Extendable {
         foreach($this->schema as $schema) {
             $query .= !$first ? ',' : '';
 
-            $query .= "`{$this->table}`.`{$schema->Field}`";
+            $query .= "`{$this->name}`.`{$schema->Field}`";
 
             $first = false;
         }
 
-        $query .= " FROM `{$this->table}` WHERE ";
+        $query .= " FROM `{$this->name}` WHERE ";
 
         $first = true;
         foreach($columns as $column => $value) {
             $operation = is_array($value) && isset($value['operation']) ? $value['operation'] : '=';
 
-            $encoded = $this->database->encode(is_array($value) ? $value['value'] : $value);
+            $encoded = $this->database->encode_value(is_array($value) ? $value['value'] : $value);
 
             $query .= !$first ? ' AND' : '';
 
-            $query .= " `{$this->table}`.`$column` $operation $encoded";
+            $query .= " `{$this->name}`.`$column` $operation $encoded";
 
             $first = false;
         }
@@ -286,7 +261,7 @@ class MySQLTable extends Extendable {
             foreach($order as $column => $direction) {
                 $query .= !$first ? ',' : '';
 
-                $query .= " `{$this->table}`.`$column` $direction";
+                $query .= " `{$this->name}`.`$column` $direction";
 
                 $first = false;
             }
@@ -302,7 +277,7 @@ class MySQLTable extends Extendable {
             return null;
         }
 
-        return $this->database->construct_model($object, $modelType);
+        return $this->database->construct_model_from_row_object($object, $modelType);
     }
 
     public function all($modelType = null) {
@@ -312,19 +287,19 @@ class MySQLTable extends Extendable {
         foreach($this->schema as $schema) {
             $query .= !$first ? ',' : '';
 
-            $query .= "`{$this->table}`.`{$schema->Field}`";
+            $query .= "`{$this->name}`.`{$schema->Field}`";
 
             $first = false;
         }
 
-        $query .= " FROM `{$this->table}`";
+        $query .= " FROM `{$this->name}`";
 
         $result = $this->database->query($query);
 
         $records = array();
 
         while($row = $result->fetch_object()) {
-            $records[] = $this->database->construct_model($row, $modelType);
+            $records[] = $this->database->construct_model_from_row_object($row, $modelType);
         }
 
         return $records;

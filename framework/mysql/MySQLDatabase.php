@@ -249,47 +249,10 @@ class MySQLDatabase {
         return $tableObject;
     }
 
-    /**
-     * @var MySQLQueryBenchmark
-     */
-    public $benchmarker = null;
+    public function check_table_exists($tableName) {
+        $showColumnsResult = $this->database_handle->query("SHOW COLUMNS FROM `{$this->database_name}`.`{$tableName}`");
 
-    public function installBenchmarker(MySQLQueryBenchmark $benchmarker) {
-        $this->benchmarker = $benchmarker;
-    }
-
-    public function query($query, $result_mode = MYSQLI_STORE_RESULT) {
-        if($this->benchmarker !== null) {
-            $queryId = $this->benchmarker->beginBenchmarkingQuery($query);
-        }
-
-        $result = $this->database_handle->query($query, $result_mode);
-
-        if($this->benchmarker !== null) {
-            $this->benchmarker->finishBenchmarkingQuery($queryId);
-        }
-
-        if(empty($result)) {
-            return 0;
-            //die($query . $this->db->errno . ' is last error ' . $this->db->error);
-            //throw new Exception("Error with query: {$query}");
-        }
-
-        return $result;
-    }
-
-    public function tableExists($tableName) {
-        $tableNameEncoded = $this->encode($tableName);
-        $databaseNameEncoded = $this->encode($this->database_name);
-
-        $results = $this->selectQuery(<<<SQL
-SELECT COUNT(*) as `count` FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = {$databaseNameEncoded} AND TABLE_NAME = {$tableNameEncoded}
-SQL
-        );
-
-        $result = $results[0];
-
-        return !empty($result->count);
+        return $showColumnsResult !== false;
     }
 
     public function selectQuery($query, $modelType = null) {
@@ -302,13 +265,13 @@ SQL
         $results = array();
 
         while($row = $result->fetch_object()) {
-            $results[] = $this->construct_model($row, $modelType);
+            $results[] = $this->construct_model_from_row_object($row, $modelType);
         }
 
         return $results;
     }
 
-    public function encode($value) {
+    public function encode_value($value) {
         if($value === false) {
             return 'false';
         }
@@ -317,10 +280,10 @@ SQL
             return 'true';
         }
 
-        return $value === null ? 'null' : "'" . $this->real_escape_string($value) . "'";
+        return $value === null ? 'null' : "'" . $this->database_handle->real_escape_string($value) . "'";
     }
 
-    public function construct_model($row, $modelType = null) {
+    public function construct_model_from_row_object($row, $modelType = null) {
         $maybeModel = ModelCache::$singleton->get_cached_model($row, $modelType);
 
         if($maybeModel !== null) {
@@ -354,37 +317,79 @@ SQL
     /**
      * @return MySQLFieldSchema[]
      */
-    public function show_columns($table_name, $try_cache = true, $write_cache = true) {
-        $cache_path = Config::$Configs['application']['paths']['cache'] . 'show_columns_' . $this->database_name . '_' . $table_name;
+    public function get_schema_for_table($tableName, $shouldLoadFromCache = true, $shouldWriteToCache = true) {
+        if($shouldLoadFromCache) {
+            $tableSchema = $this->load_table_schema_from_cache($tableName);
 
-        if($try_cache && file_exists($cache_path)) {
-            $schema = json_decode(file_get_contents($cache_path));
-            $schema = !is_array($schema) ? array() : $schema;
-
-            return $schema;
-        }
-
-        $table_name_escaped = $this->real_escape_string($table_name);
-
-        $result = $this->query("SHOW COLUMNS FROM `{$table_name_escaped}`");
-
-        if(false === $result || !is_object($result)) {
-            throw new Exception("Table `{$table_name_escaped}` does not exist");
-        }
-
-        $schema = array();
-
-        while($row = $result->fetch_object()) {
-            $schema[] = new MySQLFieldSchema($row);
-        }
-
-        if($write_cache) {
-            if(!is_dir(Config::$Configs['application']['paths']['cache'])) {
-                @mkdir(Config::$Configs['application']['paths']['cache'], 0777, true);
+            if($tableSchema !== null) {
+                return $tableSchema;
             }
-            file_put_contents($cache_path, json_encode($schema));
         }
 
-        return $schema;
+        $showColumnsResult = $this->database_handle->query("SHOW COLUMNS FROM `{$this->database_name}`.`{$tableName}`");
+
+        if(false === $showColumnsResult) {
+            return null;
+        }
+
+        $tableSchema = new MySQLTableSchema();
+
+        while($row = $showColumnsResult->fetch_object()) {
+            /*
+            $tableSchema[] = new MySQLFieldSchema($row);*/
+        }
+
+        if($shouldWriteToCache) {
+            $this->write_table_schema_to_cache($tableName, $tableSchema);
+        }
+
+        return $tableSchema;
+    }
+
+    public function load_table_schema_from_cache($tableName) {
+        $cacheDirectory = lighter()->get_cache_path();
+        $cacheFilePath = $cacheDirectory . 'mysql_table_schema_' . $this->database_name . '_' . $tableName;
+
+        if(!is_dir($cacheDirectory)) {
+            throw new Exception("Application cache directory ({$cacheDirectory}) does not exist. Make sure the directory is writable.");
+        }
+
+        if(!file_exists($cacheFilePath)) {
+            return null;
+        }
+
+        $serializedTableSchema = file_get_contents($cacheFilePath);
+        $tableSchema = unserialize($serializedTableSchema);
+
+        if(!is_object($tableSchema) || get_class($tableSchema) != 'MySQLTableSchema') {
+            if(!is_writable($cacheFilePath)) {
+                throw new Exception("Application cache directory ({$cacheDirectory}) is not writable.");
+            }
+
+            @unlink($cacheFilePath);
+
+            return null;
+        }
+
+        return $tableSchema;
+    }
+
+    public function write_table_schema_to_cache($tableName, $tableSchema) {
+        $cacheDirectory = lighter()->get_cache_path();
+        $cacheFilePath = $cacheDirectory . 'mysql_table_schema_' . $this->database_name . '_' . $tableName;
+
+        if(!is_dir($cacheDirectory)) {
+            throw new Exception("Application cache directory ({$cacheDirectory}) does not exist. Make sure the directory is writable.");
+        }
+
+        if(!is_writable($cacheFilePath)) {
+            throw new Exception("Application cache directory ({$cacheDirectory}) is not writable.");
+        }
+
+        $serializedTableSchema = serialize($tableSchema);
+
+        if(false === file_put_contents($cacheFilePath, $serializedTableSchema)){
+            throw new Exception("Unable to write to application cache directory ({$cacheDirectory}).");
+        }
     }
 }

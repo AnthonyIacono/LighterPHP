@@ -9,7 +9,7 @@ class ModelBindingCheckerShell extends  AppShell {
             $table_name = $argParts[0];
             $model_name = $argParts[1];
 
-            $schema = $this->database->show_columns($table_name, false, false);
+            $schema = $this->database->get_schema_for_table($table_name, false, false);
 
             $fakeData = array();
 

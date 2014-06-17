@@ -32,6 +32,7 @@ include_once('HTTPUtils.php');
 include_once('models/Model.php');
 include_once('models/MySQLModel.php');
 include_once('mysql/MySQLDatabase.php');
+include_once('mysql/MySQLTable.php');
 include_once('mysql/MySQLFactory.php');
 include_once('responses/Response.php');
 include_once('responses/ViewResponse.php');
@@ -259,6 +260,14 @@ class Lighter {
      */
     public function get_views_path() {
         return $this->get_application_path() . 'views/';
+    }
+
+    /**
+     * Using this function you can get the cache directory of your application.
+     * @return string
+     */
+    public function get_cache_path() {
+        return $this->get_application_path() . 'cache/';
     }
 
     /**

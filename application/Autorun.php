@@ -12,3 +12,6 @@
  * Uncomment the following line if you need to add the default autoloader rules back into the autoloader.
  */
 //lighter()->get_autoloader()->add_default_rules();
+
+// Comment the line below to disable the default MySQL database.
+db()->connect();
